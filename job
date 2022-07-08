@@ -1,0 +1,30 @@
+BUCKET=s3://parc
+LOC=$BUCKET/Mars/RDR/PSP/ORB_001300_001399/PSP_001330_1395
+
+S3CP="aws s3 cp --quiet"
+ACL="--acl bucket-owner-full-control"
+CLASS="--storage-class STANDARD"
+
+aws s3 ls --recursive $LOC |grep JP2\$ |\
+while read _ _ _ jp2
+do
+#  echo $jp2
+  mrf=${jp2%JP2}mrf
+  aws s3 ls $BUCKET/$mrf >/dev/null
+  if [[ 0 == $? ]]
+  then
+    continue
+  else
+    echo $(date) $jp2
+    dir=$(dirname $jp2)
+    fn=$(basename $jp2)
+    touch ${fn%.*}.mrf
+    $S3CP $ACL ${fn%.*}.mrf $BUCKET/$mrf
+    $S3CP $BUCKET/$jp2 .
+    ./convert $fn
+    $S3CP $ACL ${fn%.*}.mrf $BUCKET/$mrf
+    $S3CP $ACL $CLASS ${fn%.*}.pq3 $BUCKET/${mrf%.*}.pq3
+    # rm ${fn%.*}.{mrf,pq3,JP2}
+    echo $(date) $jp2
+  fi
+done
