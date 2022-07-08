@@ -1,0 +1,9 @@
+export GDAL_CACHEMAX=7%
+export CPL_DEBUG=MRF_TIMING
+GTP="-q -co COMPRESS=QB3 -co BLOCKSIZE=512 -co PHOTOMETRIC=MULTISPECTRAL -co QUALITY=99 -co UNIFORM_SCALE=2"
+# out=QB3/${1#*/}
+out=${1%.*}
+gdal_translate $GTP -co INDEXNAME=$out.pq3 $1 $out.mrf
+gdaladdo -q -r avg $out.mrf 2 4 8 16 32 64 128 256 512 1024 2>&1 | grep -v "overview factor"
+# sed -i -e "s?$(dirname $out)/??" $out.mrf
+rm $out.mrf.aux.xml
