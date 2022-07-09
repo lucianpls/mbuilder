@@ -1,30 +1,39 @@
 BUCKET=s3://parc
-LOC=$BUCKET/Mars/RDR/PSP/ORB_001300_001399/PSP_001330_1395
+
+LOC=${1:-Mars/RDR/PSP/ORB_001300_001399/PSP_001330_1395}
+SRC=$BUCKET/$LOC
 
 S3CP="aws s3 cp --quiet"
 ACL="--acl bucket-owner-full-control"
 CLASS="--storage-class STANDARD"
 
-aws s3 ls --recursive $LOC |grep JP2\$ |\
+aws s3 ls --recursive $SRC |grep JP2\$ |\
 while read _ _ _ jp2
 do
-#  echo $jp2
   mrf=${jp2%JP2}mrf
   aws s3 ls $BUCKET/$mrf >/dev/null
-  if [[ 0 == $? ]]
-  then
-    continue
-  else
-    echo $(date) $jp2
-    dir=$(dirname $jp2)
-    fn=$(basename $jp2)
-    touch ${fn%.*}.mrf
-    $S3CP $ACL ${fn%.*}.mrf $BUCKET/$mrf
-    $S3CP $BUCKET/$jp2 .
-    ./convert $fn
-    $S3CP $ACL ${fn%.*}.mrf $BUCKET/$mrf
-    $S3CP $ACL $CLASS ${fn%.*}.pq3 $BUCKET/${mrf%.*}.pq3
-    # rm ${fn%.*}.{mrf,pq3,JP2}
-    echo $(date) $jp2
-  fi
+  if [[ 0 == $? ]]; then continue; fi
+  fn=$(basename $jp2)
+  bfn=${fn%.*}
+  echo $$ >$bfn.mrf
+  # Use an empty mrf file to signal that file is being processed
+  $S3CP $ACL $bfn.mrf $BUCKET/$mrf
+  # Check that we own it
+  [[ $(aws s3 cp $BUCKET/$mrf -) -eq $$ ]] || continue
+  echo B $(date) $jp2
+  $S3CP $BUCKET/$jp2 .
+  [[ -e ./convert ]] && ./convert $fn
+  [[ -e ../convert ]] && ../convert $fn
+  rm $fn
+  # This will compute the histograms and store them in the aux.xml file
+  [[ -e ./do_hist.py ]] && python3 ./do_hist.py $bfn.mrf
+  [[ -e ../do_hist.py ]] && python3 ../do_hist.py $bfn.mrf
+  # Shove the PAM file inside the MRF xml
+  (head -n -1 $bfn.mrf; cat $bfn.mrf.aux.xml; tail -1 $bfn.mrf) >$bfn.mmrf
+  DST=$(dirname $jp2)
+  DST=$BUCKET/${DST/RDR/QB3}
+  $S3CP $ACL $bfn.mmrf $DST/$bfn.mrf
+  $S3CP $ACL $CLASS $bfn.pq3 $DST/$bfn.pq3
+  rm $bfn.*
+  echo E $(date) $jp2
 done

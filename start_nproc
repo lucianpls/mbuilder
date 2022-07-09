@@ -1,0 +1,12 @@
+#!/bin/bash
+
+let jnum=0
+while [[ $jnum -lt $(nproc) ]]
+do
+  jdir=$(printf %02d $jnum)
+  mkdir $jdir
+  pushd $jdir
+    ../job Mars/RDR/PSP/ORB_001300_001399 >>../output.log 2>error.log &
+  popd
+  ((jnum++))
+done
