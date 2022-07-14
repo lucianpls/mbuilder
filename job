@@ -18,7 +18,10 @@ do
   echo $$ >$bfn.mrf
   # Use an empty mrf file to signal that file is being processed
   $S3CP $ACL $bfn.mrf $BUCKET/$mrf
-  # Check that we own it
+  rm $bfn.mrf
+  # Check that we own it, wait a second and check again
+  [[ $(aws s3 cp $BUCKET/$mrf -) -eq $$ ]] || continue
+  sleep 1
   [[ $(aws s3 cp $BUCKET/$mrf -) -eq $$ ]] || continue
   echo B $(date) $jp2
   $S3CP $BUCKET/$jp2 .
